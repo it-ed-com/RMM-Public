@@ -1,0 +1,60 @@
+<#
+.Synopsis
+   Script d'installation de DataBaseEngine
+.DESCRIPTION
+    Installation de DataBaseEngine
+.CREATOR
+    Marc-André Brochu | HelpOX | mabrochu@helpox.com | 514-666-4357 Ext:3511
+.DATE
+    20 Fevrier 2022
+.VERSION
+    1.0.1 Premier Commit du script
+#>
+
+########################################################
+## Configuration Custom image templates    ##
+########################################################
+write-host "05_Install-DatabaseEngine.ps1"
+
+New-Item -Path "C:\HelpOX\GoldenImage\Log" -ItemType directory -force
+$logpath = "C:\HelpOX\GoldenImage\Log"
+$LogFile = "C:\HelpOX\GoldenImage\Log\$env:computername.txt"
+
+if (!(Test-Path $LogFile)) {
+    write-host 'Creation du fichier de log'
+    New-Item -Path "C:\HelpOX\GoldenImage\Log\$env:computername.txt" -ItemType file -force
+
+}
+########################################################
+## Register AccessDatabaseEngine                      ##
+########################################################
+
+if (-not (Get-WmiObject win32_product | where{$_.Name -like "*Microsoft Access database engine 2010*"}))
+{
+    try {
+         Add-Content -Path $LogFile "========================== Installation DATABASE ENGINE =========================="
+
+         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
+         Add-Content -Path $LogFile "[$now] Telechargement Database Engine en cours ..."
+         Write-Host -ForegroundColor yellow "[HelpOX] Installation de Microsoft Access database engine 2010 ..."
+         New-Item -Path "c:\" -Name "temp" -ItemType "directory"
+         Invoke-WebRequest -Uri 'Remplace_GITHUBLINK' -OutFile 'C:\temp\AccessDatabaseEngine.exe'
+         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
+         Add-Content -Path $LogFile "[$now] Telechargement Database Engine Completer"
+         Add-Content -Path $LogFile "[$now] Installation de Database Engine en cours ..."
+         C:\temp\AccessDatabaseEngine.exe /quiet
+         sleep 90
+         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
+         Add-Content -Path $LogFile "[$now] Installation de Database Engine Completer"
+         Remove-Item "C:\temp" -Force -Recurse -Confirm:$false
+         }
+
+    catch {
+           Write-Error $_
+    }
+
+}
+else 
+{
+    Write-Host -ForegroundColor Green "[HelpOX] Microsoft Access database engine 2010 is already installed on the server!"
+}
