@@ -1,60 +1,108 @@
 <#
-.Synopsis
-   Script d'installation de DataBaseEngine
-.DESCRIPTION
-    Installation de DataBaseEngine
-.CREATOR
-    Marc-André Brochu | HelpOX | mabrochu@helpox.com | 514-666-4357 Ext:3511
-.DATE
-    20 Fevrier 2022
-.VERSION
-    1.0.1 Premier Commit du script
+    Script Name: Install-AccessDatabaseEngine.ps1
+    Author:      Marc-Andre Brochu
+    Email:       mabrochu@it-ed.com
+    Date:        October 17, 2023
+    Description: This script automates the download and installation of Access Database Engine on Windows 10.
+                 It validates the installation and logs the process to C:\ited\logs\databaseengine.log.
 #>
 
-########################################################
-## Configuration Custom image templates    ##
-########################################################
-write-host "05_Install-DatabaseEngine.ps1"
+# =========================================
+# Configuration Parameters
+# =========================================
 
-New-Item -Path "C:\HelpOX\GoldenImage\Log" -ItemType directory -force
-$logpath = "C:\HelpOX\GoldenImage\Log"
-$LogFile = "C:\HelpOX\GoldenImage\Log\$env:computername.txt"
-
-if (!(Test-Path $LogFile)) {
-    write-host 'Creation du fichier de log'
-    New-Item -Path "C:\HelpOX\GoldenImage\Log\$env:computername.txt" -ItemType file -force
-
+# Ensure the log directory exists
+$logDirectory = "C:\ited\logs"
+if (!(Test-Path -Path $logDirectory)) {
+    New-Item -ItemType Directory -Path $logDirectory -Force
 }
-########################################################
-## Register AccessDatabaseEngine                      ##
-########################################################
 
-if (-not (Get-WmiObject win32_product | where{$_.Name -like "*Microsoft Access database engine 2010*"}))
-{
-    try {
-         Add-Content -Path $LogFile "========================== Installation DATABASE ENGINE =========================="
+# Log file path
+$logFile = "$logDirectory\databaseengine.log"
 
-         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-         Add-Content -Path $LogFile "[$now] Telechargement Database Engine en cours ..."
-         Write-Host -ForegroundColor yellow "[HelpOX] Installation de Microsoft Access database engine 2010 ..."
-         New-Item -Path "c:\" -Name "temp" -ItemType "directory"
-         Invoke-WebRequest -Uri 'Remplace_GITHUBLINK' -OutFile 'C:\temp\AccessDatabaseEngine.exe'
-         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-         Add-Content -Path $LogFile "[$now] Telechargement Database Engine Completer"
-         Add-Content -Path $LogFile "[$now] Installation de Database Engine en cours ..."
-         C:\temp\AccessDatabaseEngine.exe /quiet
-         sleep 90
-         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-         Add-Content -Path $LogFile "[$now] Installation de Database Engine Completer"
-         Remove-Item "C:\temp" -Force -Recurse -Confirm:$false
-         }
+# Installer download URL (use the URL provided)
+$installerUrl = "https://raw.githubusercontent.com/it-ed-com/RMM-Public/refs/heads/main/Custom%20image%20templates/Install-DatabaseEngine/AccessDatabaseEngine.exe"
 
-    catch {
-           Write-Error $_
+# Path to save the downloaded installer
+$installerPath = "C:\Temp\AccessDatabaseEngine.exe"
+
+# =========================================
+# Logging Functions
+# =========================================
+
+Function Write-Log {
+    param (
+        [string]$message,
+        [string]$type = "INFO"
+    )
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logMessage = "$timestamp [$type] $message"
+    Write-Host $logMessage
+}
+
+# Start transcript to log all output to the log file
+Start-Transcript -Path $logFile -Append -NoClobber
+
+# =========================================
+# Script Execution
+# =========================================
+
+Try {
+    Write-Log "Starting Access Database Engine installation script."
+
+    # Create Temp directory if it doesn't exist
+    if (!(Test-Path -Path "C:\Temp")) {
+        Write-Log "Creating C:\Temp directory."
+        New-Item -ItemType Directory -Path "C:\Temp" -Force
     }
 
+    # Download the Access Database Engine installer
+    Write-Log "Downloading Access Database Engine installer from $installerUrl."
+    Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -ErrorAction Stop
+
+    # Verify if the installer was downloaded
+    if (Test-Path -Path $installerPath) {
+        Write-Log "Installer downloaded successfully to $installerPath."
+    } else {
+        Write-Log "Installer download failed." "ERROR"
+        Throw "Installer download failed."
+    }
+
+    # Install Access Database Engine silently without restart
+    Write-Log "Starting silent installation of Access Database Engine without restart."
+    $installArgs = "/quiet /norestart"
+    $process = Start-Process -FilePath $installerPath -ArgumentList $installArgs -Wait -PassThru
+
+    # Check the exit code of the installer
+    if ($process.ExitCode -eq 0) {
+        Write-Log "Access Database Engine installed successfully."
+    } else {
+        Write-Log "Access Database Engine installation failed with exit code $($process.ExitCode)." "ERROR"
+        Throw "Access Database Engine installation failed with exit code $($process.ExitCode)."
+    }
+
+    # Validate the installation
+    Write-Log "Validating Access Database Engine installation."
+    $installedProduct = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "Microsoft Access database engine*" }
+    if ($installedProduct) {
+        Write-Log "Access Database Engine is installed. Version: $($installedProduct.Version)"
+    } else {
+        Write-Log "Access Database Engine is not installed." "ERROR"
+        Throw "Access Database Engine is not installed."
+    }
+
+    # Cleanup: Remove the installer file
+    Write-Log "Cleaning up installer file."
+    Remove-Item -Path $installerPath -Force -ErrorAction SilentlyContinue
+
+    Write-Log "Access Database Engine installation script completed successfully."
+    Exit 0
 }
-else 
-{
-    Write-Host -ForegroundColor Green "[HelpOX] Microsoft Access database engine 2010 is already installed on the server!"
+Catch {
+    Write-Log "An error occurred: $_" "ERROR"
+    Exit 1
+}
+Finally {
+    # Stop transcript to finalize the log file
+    Stop-Transcript
 }
