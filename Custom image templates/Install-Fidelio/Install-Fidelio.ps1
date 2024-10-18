@@ -1,72 +1,115 @@
 <#
-.Synopsis
-   Script d'installation de Fidelio
-.DESCRIPTION
-    Installation de NetFrameWork
-.CREATOR
-    Marc-André Brochu | HelpOX | mabrochu@helpox.com | 514-666-4357 Ext:3511
-.DATE
-    20 Fevrier 2022
-.VERSION
-    1.0.1 Premier Commit du script
+    Script Name: Install-Fidelio.ps1
+    Author:      Marc-Andre Brochu
+    Email:       mabrochu@it-ed.com
+    Date:        October 17, 2023
+    Requirment:  .NET Framework version 2.0
+    Description: This script automates the download and installation of Fidelio on Windows 10.
+                 It validates the installation, removes the desktop icon, and logs the process to C:\ited\logs\fidelio.log.
 #>
 
-########################################################
-## Configuration Custom image templates    ##
-########################################################
-write-host "06_Install-Fidelio.ps1"
+# =========================================
+# Configuration Parameters
+# =========================================
 
-New-Item -Path "C:\HelpOX\GoldenImage\Log" -ItemType directory -force
-$logpath = "C:\HelpOX\GoldenImage\Log"
-$LogFile = "C:\HelpOX\GoldenImage\Log\$env:computername.txt"
-
-if (!(Test-Path $LogFile)) {
-    write-host 'Creation du fichier de log'
-    New-Item -Path "C:\HelpOX\GoldenImage\Log\$env:computername.txt" -ItemType file -force
-
+# Ensure the log directory exists
+$logDirectory = "C:\ited\logs"
+if (!(Test-Path -Path $logDirectory)) {
+    New-Item -ItemType Directory -Path $logDirectory -Force
 }
 
-########################################################
-## Install de Commsoft Fidelio                        ##
-########################################################
+# Log file path
+$logFile = "$logDirectory\fidelio.log"
 
-if (-not (Get-WmiObject win32_product | where{$_.Name -like "*Fidelio*"}))
-{
-    try {
-         Add-Content -Path $LogFile "========================== Installation de Commsoft Fidelio =========================="
+# Installer download URL
+$installerUrl = "https://raw.githubusercontent.com/it-ed-com/RMM-Public/refs/heads/main/Custom%20image%20templates/Install-Fidelio/FidelioSetup.msi"
 
-         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-         Add-Content -Path $LogFile "[$now] Telechargement de Fidelio en cours ..."
-         
-         Write-Host -ForegroundColor yellow "[HelpOX] Installing Commsoft Fidelio..."
-         New-Item -Path "c:\" -Name "temp" -ItemType "directory"
-         Invoke-WebRequest -Uri 'Remplace_GITHUBLINK' -OutFile 'C:\temp\FidelioSetup.msi'
-         
-         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-         Add-Content -Path $LogFile "[$now] Telechargement de Fidelio terminer" 
-         Add-Content -Path $LogFile "[$now] Installation de Fidelio en cour ..." 
-         
-         msiexec /i "C:\temp\FidelioSetup.msi" TARGETDIR="C:\Fidelio" /q
+# Path to save the downloaded installer
+$installerPath = "C:\Temp\FidelioSetup.msi"
 
-         Start-sleep -Seconds 90
+# Installation directory
+$installDir = "C:\Fidelio"
 
-         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-         Add-Content -Path $LogFile "[$now] Installation de Fidelio terminer" 
+# =========================================
+# Logging Function
+# =========================================
 
-        
-         Remove-Item C:\Users\Public\Desktop\* -Force -Confirm:$false
-         Remove-Item "C:\temp" -Force -Recurse -Confirm:$false
-         
-         $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-         Add-Content -Path $LogFile "[$now] Nettoyage des sources de Fidelio terminer" 
-    }
-
-    catch {
-           Write-Error $_
-    }
-
+Function Write-Log {
+    param (
+        [string]$message,
+        [string]$type = "INFO"
+    )
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logMessage = "$timestamp [$type] $message"
+    Write-Host $logMessage
 }
-else 
-{
-    Write-Host -ForegroundColor Green "[HelpOX] Commsoft Fidelio is already installed on the server!"
+
+# Start transcript to log all output to the log file
+Start-Transcript -Path $logFile -Append -NoClobber
+
+# =========================================
+# Script Execution
+# =========================================
+
+Try {
+    Write-Log "Starting Fidelio installation script."
+
+    # Create Temp directory if it doesn't exist
+    if (!(Test-Path -Path "C:\Temp")) {
+        Write-Log "Creating C:\Temp directory."
+        New-Item -ItemType Directory -Path "C:\Temp" -Force
+    }
+
+    # Download the Fidelio installer
+    Write-Log "Downloading Fidelio installer from $installerUrl."
+    Invoke-WebRequest -Uri $installerUrl -OutFile $installerPath -ErrorAction Stop
+
+    # Verify if the installer was downloaded
+    if (Test-Path -Path $installerPath) {
+        Write-Log "Installer downloaded successfully to $installerPath."
+    } else {
+        Write-Log "Installer download failed." "ERROR"
+        Throw "Installer download failed."
+    }
+
+    # Install Fidelio silently with specified arguments
+    Write-Log "Starting silent installation of Fidelio."
+    $installArgs = "/i `"$installerPath`" TARGETDIR=`"$installDir`" /q"
+    $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $installArgs -Wait -PassThru
+
+    # Check the exit code of the installer
+    if ($process.ExitCode -eq 0) {
+        Write-Log "Fidelio installed successfully."
+    } else {
+        Write-Log "Fidelio installation failed with exit code $($process.ExitCode)." "ERROR"
+        Throw "Fidelio installation failed with exit code $($process.ExitCode)."
+    }
+
+    # Validate the installation
+    Write-Log "Validating Fidelio installation."
+    if (Test-Path -Path "$installDir\Fidelio.exe") {
+        Write-Log "Fidelio is installed at $installDir."
+    } else {
+        Write-Log "Fidelio is not installed in $installDir." "ERROR"
+        Throw "Fidelio is not installed in $installDir."
+    }
+
+    # Remove desktop icons
+    Write-Log "Removing desktop icons."
+    Remove-Item "C:\Users\Public\Desktop\*" -Force -ErrorAction SilentlyContinue
+
+    # Cleanup: Remove the installer file
+    Write-Log "Cleaning up installer file."
+    Remove-Item -Path $installerPath -Force -ErrorAction SilentlyContinue
+
+    Write-Log "Fidelio installation script completed successfully."
+    Exit 0
+}
+Catch {
+    Write-Log "An error occurred: $_" "ERROR"
+    Exit 1
+}
+Finally {
+    # Stop transcript to finalize the log file
+    Stop-Transcript
 }
