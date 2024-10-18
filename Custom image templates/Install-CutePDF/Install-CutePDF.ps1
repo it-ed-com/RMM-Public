@@ -91,31 +91,6 @@ Try {
         Throw "CutePDF Writer is not installed or the printer is missing."
     }
 
-    # Set default paper size to Letter
-    Write-Log "Setting default paper size to Letter."
-    $printerName = "CutePDF Writer"
-
-    # Get the printer using WMI
-    $wmiPrinter = Get-WmiObject -Class Win32_Printer -Filter "Name = '$printerName'"
-
-    if ($wmiPrinter) {
-        $devMode = $wmiPrinter.GetPrinterProperties().DevMode
-        # Paper size code for Letter is 1
-        $dmPaperSizeLetter = 1
-        $devMode.dmPaperSize = $dmPaperSizeLetter
-        $devModeFields = [System.Management.ManagementBaseObject]$devMode
-        $result = $wmiPrinter.SetPrinterProperties($devModeFields)
-        if ($result.ReturnValue -eq 0) {
-            Write-Log "Default paper size set to Letter for $printerName."
-        } else {
-            Write-Log "Failed to set default paper size. Error code: $($result.ReturnValue)" "ERROR"
-            Throw "Failed to set default paper size. Error code: $($result.ReturnValue)"
-        }
-    } else {
-        Write-Log "Failed to find printer $printerName for setting paper size." "ERROR"
-        Throw "Failed to find printer $printerName."
-    }
-
     # Cleanup: Remove the installer file
     Write-Log "Cleaning up installer file."
     Remove-Item -Path $cutepdfInstallerPath -Force -ErrorAction SilentlyContinue
