@@ -87,7 +87,7 @@ Try {
 
     # Validate the installation
     Write-Log "Validating Fidelio installation."
-    if (Test-Path -Path "$installDir\Fidelio.exe") {
+    if (Test-Path -Path "$installDir\Fidelio.ico") {
         Write-Log "Fidelio is installed at $installDir."
     } else {
         Write-Log "Fidelio is not installed in $installDir." "ERROR"
