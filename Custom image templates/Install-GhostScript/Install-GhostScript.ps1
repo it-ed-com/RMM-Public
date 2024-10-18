@@ -1,51 +1,98 @@
-########################################################
-## Configuration de l'image AVD ERPCOOP-SOLLIO.NET    ##
-########################################################
+<# 
+    Script Name: Install-GhostScript.ps1
+    Author:      Marc-Andre Brochu
+    Email:       mabrochu@it-ed.com
+    Date:        October 18, 2023
+    Description: This script automates the download and installation of Ghostscript on Windows 10.
+                 It validates the installation and logs the process to C:\ited\logs\ghostscript.log.
+#>
 
-write-host "07_Install-GhostScript.ps1"
+# =========================================
+# Configuration Parameters
+# =========================================
 
-New-Item -Path "C:\HelpOX\GoldenImage\Log" -ItemType directory -force
-$logpath = "C:\HelpOX\GoldenImage\Log"
-$LogFile = "C:\HelpOX\GoldenImage\Log\$env:computername.txt"
-
-if (!(Test-Path $LogFile)) {
-    write-host 'Creation du fichier de log'
-    New-Item -Path "C:\HelpOX\GoldenImage\Log\$env:computername.txt" -ItemType file -force
-
+# Ensure the log directory exists
+$logDirectory = "C:\ited\logs"
+if (!(Test-Path -Path $logDirectory)) {
+    New-Item -ItemType Directory -Path $logDirectory -Force
 }
 
-########################################################
-## Install Ghost Script                               ##
-########################################################
+# Log file path
+$logFile = "$logDirectory\ghostscript.log"
 
-$path = "C:\Program Files\gs\gs9.55.0\bin\gswin64.exe"
+# URL for the Ghostscript installer
+$ghostscriptUrl = "https://raw.githubusercontent.com/it-ed-com/RMM-Public/refs/heads/main/Custom%20image%20templates/Install-GhostScript/gs10021w64.msi"
 
-if (!(Test-Path $path)) {
-  
-    try{
-        Add-Content -Path $LogFile "========================== Installation De GhostScript =========================="
+# Path to save the downloaded installer
+$ghostscriptInstallerPath = "C:\Temp\gs10021w64.msi"
 
-        $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-        Add-Content -Path $LogFile "[$now] Telechargement de GhostScript en cours ..."
-    
-        Write-Host -ForegroundColor yellow "[HelpOX] Installing GhostScript..."
-        New-Item -Path "c:\" -Name "temp" -ItemType "directory"
-        Invoke-WebRequest -Uri 'Remplace_GITHUBLINK' -OutFile 'C:\temp\gs910w64.exe'
-        $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-        Add-Content -Path $LogFile "[$now] Telechargement de GhostScript terminer"
-        Add-Content -Path $LogFile "[$now] Installation de GhostScript en cours ..."
-        C:\temp\gs910w64.exe /S
-        Start-sleep -Seconds 90
-        $now = Get-Date -Format "MM/dd/yyyy HH:mm"
-        Add-Content -Path $LogFile "[$now] Installation de GhostScript terminer"        
-        Remove-Item "C:\temp" -Force -Recurse -Confirm:$false
-        Add-Content -Path $LogFile "[$now] Nettoyage des sources de GhostScript terminer" 
-  }
-    catch {
-            Write-Error $_
-    }  
+# =========================================
+# Logging Functions
+# =========================================
+
+Function Write-Log {
+    param (
+        [string]$message,
+        [string]$type = "INFO"
+    )
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logMessage = "$timestamp [$type] $message"
+    Write-Host $logMessage
 }
-else 
-{
-    Write-Host -ForegroundColor Green "[HelpOX] GhostScript is already installed on the server!"
+
+# Start transcript to log all output to the log file
+Start-Transcript -Path $logFile -Append -NoClobber
+
+# =========================================
+# Script Execution
+# =========================================
+
+Try {
+    Write-Log "Starting Ghostscript installation script."
+
+    # Create Temp directory if it doesn't exist
+    if (!(Test-Path -Path "C:\Temp")) {
+        Write-Log "Creating C:\Temp directory."
+        New-Item -ItemType Directory -Path "C:\Temp" -Force
+    }
+
+    # Download the Ghostscript installer
+    Write-Log "Downloading Ghostscript installer from $ghostscriptUrl."
+    Invoke-WebRequest -Uri $ghostscriptUrl -OutFile $ghostscriptInstallerPath -ErrorAction Stop
+
+    # Verify if the installer was downloaded
+    if (Test-Path -Path $ghostscriptInstallerPath) {
+        Write-Log "Ghostscript installer downloaded successfully to $ghostscriptInstallerPath."
+    } else {
+        Write-Log "Ghostscript installer download failed." "ERROR"
+        Throw "Ghostscript installer download failed."
+    }
+
+    # Install Ghostscript silently
+    Write-Log "Starting silent installation of Ghostscript."
+    $ghostscriptInstallArgs = "/qn"
+    $ghostscriptProcess = Start-Process -FilePath $ghostscriptInstallerPath -ArgumentList $ghostscriptInstallArgs -Wait -PassThru
+
+    # Check the exit code of the Ghostscript installer
+    if ($ghostscriptProcess.ExitCode -eq 0) {
+        Write-Log "Ghostscript installed successfully."
+    } else {
+        Write-Log "Ghostscript installation failed with exit code $($ghostscriptProcess.ExitCode)." "ERROR"
+        Throw "Ghostscript installation failed with exit code $($ghostscriptProcess.ExitCode)."
+    }
+
+    # Cleanup: Remove the installer file
+    Write-Log "Cleaning up installer file."
+    Remove-Item -Path $ghostscriptInstallerPath -Force -ErrorAction SilentlyContinue
+
+    Write-Log "Ghostscript installation script completed successfully."
+    Exit 0
+}
+Catch {
+    Write-Log "An error occurred: $_" "ERROR"
+    Exit 1
+}
+Finally {
+    # Stop transcript to finalize the log file
+    Stop-Transcript
 }
