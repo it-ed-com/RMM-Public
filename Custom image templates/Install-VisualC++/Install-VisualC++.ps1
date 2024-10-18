@@ -21,8 +21,8 @@ if (!(Test-Path -Path $logDirectory)) {
 $logFile = "$logDirectory\visualc.log"
 
 # Installer download URLs
-$x64InstallerUrl = "https://raw.githubusercontent.com/it-ed-com/RMM-Public/refs/heads/main/Custom%20image%20templates/Install-Visual_C/VC_redist.x64.exe"
-$x86InstallerUrl = "https://raw.githubusercontent.com/it-ed-com/RMM-Public/refs/heads/main/Custom%20image%20templates/Install-Visual_C/VC_redist.x86.exe"
+$x64InstallerUrl = "https://raw.githubusercontent.com/it-ed-com/RMM-Public/refs/heads/main/Custom%20image%20templates/Install-VisualC%2B%2B/VC_redist.x64.exe"
+$x86InstallerUrl = "https://raw.githubusercontent.com/it-ed-com/RMM-Public/refs/heads/main/Custom%20image%20templates/Install-VisualC%2B%2B/VC_redist.x86.exe"
 
 # Paths to save the downloaded installers
 $installerPathX64 = "C:\Temp\VC_redist.x64.exe"
