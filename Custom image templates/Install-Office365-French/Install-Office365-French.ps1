@@ -111,7 +111,11 @@ Try {
 
     # Validate the installation by checking if Office applications are installed
     Write-Log "Validating Office 365 installation."
-    $officeProducts = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -like "Microsoft Office*" }
+
+    # Utiliser un motif avec wildcard pour la validation
+    $searchPattern = "*Microsoft 365 Apps for business*"
+    $officeProducts = Get-CimInstance -ClassName Win32_Product | Where-Object { $_.Name -like $searchPattern }
+
     if ($officeProducts) {
         Write-Log "Office 365 is installed successfully."
     } else {
