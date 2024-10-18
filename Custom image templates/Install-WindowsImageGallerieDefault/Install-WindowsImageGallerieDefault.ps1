@@ -1,55 +1,149 @@
 <#
-.Synopsis
-   Register Image Gallerie as default
-.DESCRIPTION
-   Le script enregistre image viewer par default
-.CREATOR
-    Marc-Andre Brochu | ited | mabrochu@it-ed.com | 514-666-4357 Ext:3511
-.DATE
-    30 Septembre 2022
-.VERSION
-    1.0.1 Premier Commit du script
+    Script Name: Install-PhotoViewer.ps1
+    Author:      Marc-Andre Brochu
+    Email:       mabrochu@it-ed.com
+    Date:        October 17, 2024
+    Description: This script re-enables Microsoft Photo Viewer and sets it as the default application
+                 for .bmp, .jpe, .jpeg, and .jpg file extensions on Windows 10 Multi-Enterprise.
+                 It logs all actions and errors to C:\ited\logs\photoviewer.log.
 #>
 
-########################################################
-##              Variable and Logs / Others            ##
-########################################################
+# =========================================
+# Configuration Parameters
+# =========================================
 
-write-host "14_Install-WindowsImageGallerieDefault.ps1"
-
-New-Item -Path "C:\HelpOX\GoldenImage\Log" -ItemType directory -force
-New-Item -Path "C:\HelpOX\GoldenImage\LanguagePack" -ItemType directory -force
-$LogFile = "C:\HelpOX\GoldenImage\Log\$env:computername.txt"
-
-if (!(Test-Path $LogFile)) {
-    write-host 'Creation du fichier de log'
-    New-Item -Path "C:\HelpOX\GoldenImage\Log\$env:computername.txt" -ItemType file -force
-
+# Ensure the log directory exists
+$logDirectory = "C:\ited\logs"
+if (!(Test-Path -Path $logDirectory)) {
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
 }
 
-########################################################
-##         Set Windows Image Viewer as default        ##
-########################################################
-Add-Content -Path $LogFile "========================== Set Windows Image Viewer as Default =========================="
+# Log file path
+$logFile = "$logDirectory\photoviewer.log"
 
-$now = Get-Date -Format "MM/dd/yyyy HH:mm"
-Add-Content -Path $LogFile "[$now] Set Windows Image Viewer as Default"
+# File extensions to associate with Photo Viewer
+$fileExtensions = @(".bmp", ".jpe", ".jpeg", ".jpg")
 
-$now = Get-Date -Format "MM/dd/yyyy HH:mm"
-Add-Content -Path $LogFile "[$now] Enregistrement du DLL PhotoViewer.dll"
-regsvr32 "C:\Program Files (x86)\Windows Photo Viewer\PhotoViewer.dll" /s
+# =========================================
+# Logging Function
+# =========================================
 
-$now = Get-Date -Format "MM/dd/yyyy HH:mm"
-Add-Content -Path $LogFile "[$now] Téléchargement des Reg file depuis Azure"
+Function Write-Log {
+    param (
+        [string]$message,
+        [string]$type = "INFO"
+    )
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logMessage = "$timestamp [$type] $message"
+    Add-Content -Path $logFile -Value $logMessage
+    Write-Host $logMessage
+}
 
-New-Item -Path "c:\" -Name "temp" -ItemType "directory"
-Invoke-WebRequest -Uri 'https://github.com/mabrochu-helpox/Azure-Sollio/raw/main/MSPhotoViewerReg/MSPhotoViewerReg.zip' -OutFile 'C:\temp\MSPhotoViewerReg.zip'
+# =========================================
+# Validation Function
+# =========================================
 
-Expand-Archive C:\temp\MSPhotoViewerReg.zip -DestinationPath C:\temp -Force
+Function Is-PhotoViewerEnabled {
+    # Check if Photo Viewer is enabled in registry
+    $regPath = "HKLM:\SOFTWARE\Microsoft\Windows Photo Viewer\Capabilities\FileAssociations"
+    if (Test-Path -Path $regPath) {
+        return $true
+    }
+    else {
+        return $false
+    }
+}
 
-$now = Get-Date -Format "MM/dd/yyyy HH:mm"
-Add-Content -Path $LogFile "[$now] Importation des clefs de registres"
-Invoke-Command {reg import "C:\temp\MS PhotoViewer.bmp.reg" *>&1 | Out-Null}
-Invoke-Command {reg import "C:\temp\MS PhotoViewer.jpe.reg" *>&1 | Out-Null}
-Invoke-Command {reg import "C:\temp\MS PhotoViewer.jpeg.reg" *>&1 | Out-Null}
-Invoke-Command {reg import "C:\temp\MS PhotoViewer.jpg.reg" *>&1 | Out-Null}
+# Function to enable Photo Viewer in registry
+Function Enable-PhotoViewer {
+    Write-Log "Enabling Microsoft Photo Viewer in registry."
+
+    # Define the registry keys and values
+    $regKeys = @{
+        "HKLM:\SOFTWARE\Microsoft\Windows Photo Viewer\Capabilities\FileAssociations" = @{
+            ".bmp" = "PhotoViewer.FileAssoc.Bmp"
+            ".jpe" = "PhotoViewer.FileAssoc.Jpeg"
+            ".jpeg" = "PhotoViewer.FileAssoc.Jpeg"
+            ".jpg" = "PhotoViewer.FileAssoc.Jpeg"
+        }
+    }
+
+    foreach ($path in $regKeys.Keys) {
+        foreach ($ext in $regKeys[$path].Keys) {
+            $progId = $regKeys[$path][$ext]
+            # Create or set the registry key
+            New-Item -Path $path -Force | Out-Null
+            Set-ItemProperty -Path $path -Name $ext -Value $progId -Force
+            Write-Log "Set $ext to $progId in $path."
+        }
+    }
+
+    Write-Log "Microsoft Photo Viewer enabled in registry."
+}
+
+# Function to set file association using assoc and ftype
+Function Set-FileAssociation {
+    param (
+        [string]$extension,
+        [string]$progId
+    )
+
+    Write-Log "Associating $extension with $progId."
+
+    # Use assoc to associate the extension with the ProgId
+    $assocCmd = "assoc $extension=$progId"
+    Write-Log "Executing: $assocCmd"
+    cmd.exe /c $assocCmd
+
+    # Define the ftype for the ProgId
+    $ftypeCmd = "ftype $progId=`"rundll32.exe %SystemRoot%\System32\shimgvw.dll,ImageView_Fullscreen %1`""
+    Write-Log "Executing: $ftypeCmd"
+    cmd.exe /c $ftypeCmd
+}
+
+# =========================================
+# Script Execution
+# =========================================
+
+Try {
+    Write-Log "Starting Microsoft Photo Viewer installation and association script."
+
+    # Ensure script is running as Administrator
+    if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole] "Administrator")) {
+        Write-Log "Script is not running with administrative privileges." "ERROR"
+        Throw "Please run this script as an Administrator."
+    }
+
+    # Enable Photo Viewer in registry if not already enabled
+    if (-not (Is-PhotoViewerEnabled)) {
+        Enable-PhotoViewer
+    }
+    else {
+        Write-Log "Microsoft Photo Viewer is already enabled in registry."
+    }
+
+    # Set file associations
+    foreach ($ext in $fileExtensions) {
+        switch ($ext) {
+            ".bmp" { $progId = "PhotoViewer.FileAssoc.Bmp" }
+            ".jpe" { $progId = "PhotoViewer.FileAssoc.Jpeg" }
+            ".jpeg" { $progId = "PhotoViewer.FileAssoc.Jpeg" }
+            ".jpg" { $progId = "PhotoViewer.FileAssoc.Jpeg" }
+            default { $progId = "PhotoViewer.FileAssoc.Jpeg" }
+        }
+
+        Set-FileAssociation -extension $ext -progId $progId
+    }
+
+    Write-Log "File associations set successfully."
+
+    Write-Log "Microsoft Photo Viewer installation and association script completed successfully."
+    Exit 0
+}
+Catch {
+    Write-Log "An error occurred: $_" "ERROR"
+    Exit 1
+}
+Finally {
+    # Nothing needed here
+}
