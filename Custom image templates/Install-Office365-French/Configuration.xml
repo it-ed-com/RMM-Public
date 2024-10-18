@@ -1,5 +1,5 @@
 <Configuration>
-	<Add OfficeClientEdition="64" Channel="Current" SourcePath="C:\HelpOX\GoldenImage\Office365\Sources" AllowCdnFallback="TRUE">
+	<Add OfficeClientEdition="64" Channel="Current" SourcePath="C:\ited\Office365\Sources" AllowCdnFallback="TRUE">
 		<Product ID="O365BusinessRetail">
 			<Language ID="fr-fr"/>
 			<ExcludeApp ID="Access"/>
