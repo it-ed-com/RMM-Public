@@ -112,9 +112,17 @@ Try {
     # Validate the installation by checking if Office applications are installed
     Write-Log "Validating Office 365 installation."
 
-    # Utiliser un motif avec wildcard pour la validation
+    # Définir le motif de recherche avec wildcard
     $searchPattern = "*Microsoft 365 Apps for business*"
-    $officeProducts = Get-CimInstance -ClassName Win32_Product | Where-Object { $_.Name -like $searchPattern }
+
+    # Définir les chemins de registre à interroger
+    $registryPaths = @(
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*",
+        "HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
+    )
+
+    # Rechercher les applications contenant le motif spécifié
+    $officeProducts = Get-ItemProperty $registryPaths | Where-Object { $_.DisplayName -like $searchPattern }
 
     if ($officeProducts) {
         Write-Log "Office 365 is installed successfully."
