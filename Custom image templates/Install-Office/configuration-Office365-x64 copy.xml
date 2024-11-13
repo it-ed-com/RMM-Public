@@ -6,6 +6,11 @@
             <ExcludeApp ID="Groove"/>
             <ExcludeApp ID="Lync"/>
             <ExcludeApp ID="OneDrive"/>
+            <ExcludeApp ID="OneNote"/>
+            <ExcludeApp ID="Outlook"/>
+            <ExcludeApp ID="PowerPoint"/>
+            <ExcludeApp ID="Publisher"/>
+            <ExcludeApp ID="Teams"/>
         </Product>
         <Product ID="LanguagePack">
             <Language ID="fr-ca"/>
